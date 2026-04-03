@@ -1,8 +1,12 @@
-.DS_Store
-.env
-.venv/
 __pycache__/
 *.pyc
+*.pyo
 
-# Local datasets / caches
-data/
+.env
+
+db/
+movie_db/
+
+.DS_Store
+
+.streamlit/
