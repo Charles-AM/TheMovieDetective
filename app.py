@@ -255,7 +255,7 @@ def run_search(query_text: str):
         clear_search()
         return
 
-    with st.spinner("Analyzing memory clues and searching the movie corpus..."):
+    with st.spinner("Analyzing memory clues and searching the movie + TV corpus..."):
         hyde_text = hyde_expand_query(client_ai, clean_query)
         final_query = clean_query if not hyde_text else f"{clean_query}. {hyde_text}"
 
@@ -287,9 +287,9 @@ def run_search(query_text: str):
 # --- SIDEBAR ---
 with st.sidebar:
     st.markdown("## 🎬 Movie Detective")
-    st.caption("Hybrid movie retrieval for vague human memory")
+    st.caption("Hybrid movie + TV retrieval for vague human memory")
 
-    st.metric("Movies Indexed", f"{collection.count():,}")
+    st.metric("Titles Indexed", f"{collection.count():,}")
 
     st.markdown("### Quick Search Ideas")
     st.button(
@@ -320,7 +320,7 @@ with st.sidebar:
     st.markdown("### About the system")
     st.markdown("""
 <div class="info-box">
-Movie Detective combines semantic retrieval, HyDE query expansion, structured clue extraction, and metadata-aware reranking to identify films from incomplete memories.
+Movie Detective combines semantic retrieval, HyDE query expansion, structured clue extraction, and metadata-aware reranking to identify movies and TV series from incomplete memories.
 </div>
 """, unsafe_allow_html=True)
 
@@ -331,8 +331,8 @@ st.markdown("""
 <div class="hero-wrap">
     <div class="hero-title">Movie Detective</div>
     <div class="hero-subtitle">
-        Describe any movie the way you actually remember it — scenes, fragments, characters, setting, mood, soundtrack, or plot clues.
-        Movie Detective interprets the memory and surfaces likely matches as visual cards.
+        Describe any movie or TV show the way you actually remember it — scenes, fragments, characters, setting, mood, soundtrack, or plot clues.
+        Movie Detective interprets the memory and surfaces likely movie/TV matches as visual cards.
     </div>
     <div class="pill-row">
         <span class="pill">Semantic Search</span>
@@ -376,6 +376,8 @@ if results and top:
             f"<div class='movie-title' style='font-size:1.9rem'>{top['title']} ({top['year']})</div>",
             unsafe_allow_html=True
         )
+        if top.get("media_label"):
+            st.caption(top["media_label"])
         st.markdown(
             f"<div class='score-badge'>Match Score: {top['score']:.1f}</div>",
             unsafe_allow_html=True
@@ -430,6 +432,9 @@ if results and top:
                 unsafe_allow_html=True
             )
 
+            if movie.get("media_label"):
+                st.caption(movie["media_label"])
+
             meta_line = movie["genres"] if movie.get("genres") else "Metadata available"
             st.markdown(
                 f"<div class='movie-meta'>{meta_line}</div>",
@@ -464,6 +469,7 @@ Examples:
 <li>animated Bible movie about Moses</li>
 <li>scary doll horror movie</li>
 <li>movie where a ship crashes into an iceberg</li>
+<li>a Spanish series where red-suited robbers plan major heists</li>
 <li>a detective hunts a serial killer in the rain</li>
 <li>father fish searching the ocean for his lost son</li>
 <li>an action movie about a retired assassin avenging his dog</li>
