@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import time
 import requests
@@ -45,32 +47,52 @@ def safe_get(url: str, params: dict | None = None, retries: int = 3):
     return None
 
 
-def build_movie_document(movie: dict, details: dict, keywords_data: dict) -> tuple[str, dict]:
-    title = movie.get("title", "")
-    original_title = details.get("original_title", "") or movie.get("original_title", "")
-    overview = movie.get("overview", "") or details.get("overview", "")
-    release_date = movie.get("release_date", "") or details.get("release_date", "")
-    year = release_date[:4] if release_date else "N/A"
+def _extract_keywords(keywords_data: dict) -> list[str]:
+    rows = keywords_data.get("keywords") or keywords_data.get("results") or []
+    return [k.get("name", "") for k in rows if k.get("name")]
+
+
+def build_title_document(item: dict, details: dict, keywords_data: dict, media_type: str) -> tuple[str, dict]:
+    is_movie = media_type == "movie"
+
+    if is_movie:
+        title = item.get("title", "") or details.get("title", "")
+        original_title = details.get("original_title", "") or item.get("original_title", "")
+        date_value = item.get("release_date", "") or details.get("release_date", "")
+        media_label = "Movie"
+    else:
+        title = item.get("name", "") or details.get("name", "")
+        original_title = details.get("original_name", "") or item.get("original_name", "")
+        date_value = item.get("first_air_date", "") or details.get("first_air_date", "")
+        media_label = "TV Series"
+
+    overview = item.get("overview", "") or details.get("overview", "")
+    year = date_value[:4] if date_value else "N/A"
 
     genres = [g.get("name", "") for g in details.get("genres", []) if g.get("name")]
-    keywords = [k.get("name", "") for k in keywords_data.get("keywords", []) if k.get("name")]
+    keywords = _extract_keywords(keywords_data)
     tagline = details.get("tagline", "") or ""
+
     collection_name = ""
-    if details.get("belongs_to_collection") and details["belongs_to_collection"].get("name"):
+    if is_movie and details.get("belongs_to_collection") and details["belongs_to_collection"].get("name"):
         collection_name = details["belongs_to_collection"]["name"]
 
     production_countries = [
         c.get("name", "") for c in details.get("production_countries", []) if c.get("name")
     ]
+    if not production_countries:
+        production_countries = [c for c in details.get("origin_country", []) if c]
+
     spoken_languages = [
         l.get("english_name", "") for l in details.get("spoken_languages", []) if l.get("english_name")
     ]
 
-    poster_path = movie.get("poster_path") or details.get("poster_path") or ""
+    poster_path = item.get("poster_path") or details.get("poster_path") or ""
     poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
 
     doc_parts = [
         f"Title: {title}",
+        f"Media type: {media_label}",
         f"Original title: {original_title}" if original_title else "",
         f"Year: {year}" if year != "N/A" else "",
         f"Overview: {overview}" if overview else "",
@@ -94,12 +116,19 @@ def build_movie_document(movie: dict, details: dict, keywords_data: dict) -> tup
         "keywords": ", ".join(keywords),
         "collection": collection_name,
         "poster": poster_url,
+        "media_type": media_type,
+        "media_label": media_label,
     }
 
     return document, metadata
 
 
-def ingest_movies(total_pages: int = 150, reset_collection: bool = False):
+def ingest_titles(
+    total_pages: int = 150,
+    reset_collection: bool = False,
+    include_movies: bool = True,
+    include_tv: bool = True,
+):
     global collection
 
     if reset_collection:
@@ -120,96 +149,112 @@ def ingest_movies(total_pages: int = 150, reset_collection: bool = False):
     skipped_existing = 0
     skipped_incomplete = 0
 
-    print(f"🚀 Starting ingestion for about {total_pages * 20} movies...")
+    sources = []
+    if include_movies:
+        sources.append(("movie", "/movie/popular"))
+    if include_tv:
+        sources.append(("tv", "/tv/popular"))
 
-    for page in range(1, total_pages + 1):
-        popular_url = f"{BASE_URL}/movie/popular"
-        popular_data = safe_get(popular_url, params={
-            "api_key": TMDB_API_KEY,
-            "language": "en-US",
-            "page": page
-        })
+    if not sources:
+        print("Nothing to ingest. Enable include_movies and/or include_tv.")
+        return
 
-        if not popular_data or "results" not in popular_data:
-            print(f"⚠️ Skipping page {page} due to fetch error.")
-            continue
+    print(f"🚀 Starting ingestion for movies/TV with {total_pages} pages each...")
 
-        ids_batch = []
-        docs_batch = []
-        metas_batch = []
-        embeds_batch = []
+    for media_type, endpoint in sources:
+        media_added = 0
+        print(f"\n📦 Ingesting {media_type.upper()} titles from {endpoint}")
 
-        for movie in popular_data["results"]:
-            movie_id = str(movie.get("id", ""))
-            if not movie_id:
+        for page in range(1, total_pages + 1):
+            popular_url = f"{BASE_URL}{endpoint}"
+            popular_data = safe_get(popular_url, params={
+                "api_key": TMDB_API_KEY,
+                "language": "en-US",
+                "page": page
+            })
+
+            if not popular_data or "results" not in popular_data:
+                print(f"⚠️ [{media_type}] Skipping page {page} due to fetch error.")
                 continue
 
-            if movie_id in existing_ids:
-                skipped_existing += 1
-                continue
+            ids_batch = []
+            docs_batch = []
+            metas_batch = []
+            embeds_batch = []
 
-            details_url = f"{BASE_URL}/movie/{movie_id}"
-            keywords_url = f"{BASE_URL}/movie/{movie_id}/keywords"
+            for item in popular_data["results"]:
+                raw_id = str(item.get("id", ""))
+                if not raw_id:
+                    continue
 
-            details = safe_get(details_url, params={"api_key": TMDB_API_KEY, "language": "en-US"})
-            keywords_data = safe_get(keywords_url, params={"api_key": TMDB_API_KEY})
+                prefixed_id = f"{media_type}_{raw_id}"
+                if prefixed_id in existing_ids or (media_type == "movie" and raw_id in existing_ids):
+                    skipped_existing += 1
+                    continue
 
-            if not details or not keywords_data:
-                skipped_incomplete += 1
-                continue
+                details_url = f"{BASE_URL}/{media_type}/{raw_id}"
+                keywords_url = f"{BASE_URL}/{media_type}/{raw_id}/keywords"
 
-            overview = movie.get("overview", "") or details.get("overview", "")
-            if not overview:
-                skipped_incomplete += 1
-                continue
+                details = safe_get(details_url, params={"api_key": TMDB_API_KEY, "language": "en-US"})
+                keywords_data = safe_get(keywords_url, params={"api_key": TMDB_API_KEY})
 
-            document, metadata = build_movie_document(movie, details, keywords_data)
+                if not details or not keywords_data:
+                    skipped_incomplete += 1
+                    continue
 
-            if not document.strip():
-                skipped_incomplete += 1
-                continue
+                overview = item.get("overview", "") or details.get("overview", "")
+                if not overview:
+                    skipped_incomplete += 1
+                    continue
 
-            try:
-                embedding = model.encode(document).tolist()
-            except Exception:
-                skipped_incomplete += 1
-                continue
+                document, metadata = build_title_document(item, details, keywords_data, media_type)
 
-            ids_batch.append(movie_id)
-            docs_batch.append(document)
-            metas_batch.append(metadata)
-            embeds_batch.append(embedding)
+                if not document.strip():
+                    skipped_incomplete += 1
+                    continue
 
-            existing_ids.add(movie_id)
+                try:
+                    embedding = model.encode(document).tolist()
+                except Exception:
+                    skipped_incomplete += 1
+                    continue
 
-        if ids_batch:
-            try:
-                collection.add(
-                    ids=ids_batch,
-                    documents=docs_batch,
-                    metadatas=metas_batch,
-                    embeddings=embeds_batch
+                ids_batch.append(prefixed_id)
+                docs_batch.append(document)
+                metas_batch.append(metadata)
+                embeds_batch.append(embedding)
+
+                existing_ids.add(prefixed_id)
+
+            if ids_batch:
+                try:
+                    collection.add(
+                        ids=ids_batch,
+                        documents=docs_batch,
+                        metadatas=metas_batch,
+                        embeddings=embeds_batch
+                    )
+                    added_count += len(ids_batch)
+                    media_added += len(ids_batch)
+                except Exception as e:
+                    print(f"❌ [{media_type}] Failed to add batch on page {page}: {e}")
+
+            if page % 10 == 0 or page == total_pages:
+                print(
+                    f"✅ [{media_type}] Page {page}/{total_pages} | "
+                    f"Added: {media_added} | Existing skipped: {skipped_existing} | "
+                    f"Incomplete skipped: {skipped_incomplete} | Current total: {collection.count()}"
                 )
-                added_count += len(ids_batch)
-            except Exception as e:
-                print(f"❌ Failed to add batch on page {page}: {e}")
 
-        if page % 10 == 0 or page == total_pages:
-            print(
-                f"✅ Page {page}/{total_pages} processed | "
-                f"Added: {added_count} | Existing skipped: {skipped_existing} | "
-                f"Incomplete skipped: {skipped_incomplete} | Current total: {collection.count()}"
-            )
+            time.sleep(0.25)
 
-        time.sleep(0.25)
-
-    print(f"\n🏁 Ingestion complete.")
-    print(f"Added new movies: {added_count}")
+    print("\n🏁 Ingestion complete.")
+    print(f"Added new titles: {added_count}")
     print(f"Skipped existing: {skipped_existing}")
     print(f"Skipped incomplete/error: {skipped_incomplete}")
-    print(f"Total movies in collection: {collection.count()}")
+    print(f"Total titles in collection: {collection.count()}")
 
 
 if __name__ == "__main__":
     # Set reset_collection=True only if you want a full rebuild.
-    ingest_movies(total_pages=150, reset_collection=False)
+    ingest_titles(total_pages=150, reset_collection=False, include_movies=True, include_tv=True)

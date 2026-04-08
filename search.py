@@ -183,8 +183,18 @@ def _franchise_bonus(franchise: str, collection_name: str, title: str, doc: str)
     return 10.0 if f in search_space else 0.0
 
 
-def _release_period_bonus(release_period: str, year_value: str) -> float:
-    if not release_period or not year_value:
+def _period_text(value) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        parts = [str(v).strip() for v in value if str(v).strip()]
+        return " ".join(parts)
+    return ""
+
+
+def _release_period_bonus(release_period, year_value: str) -> float:
+    release_period_text = _period_text(release_period)
+    if not release_period_text or not year_value:
         return 0.0
 
     year_text = str(year_value).strip()
@@ -192,7 +202,7 @@ def _release_period_bonus(release_period: str, year_value: str) -> float:
         return 0.0
 
     year = int(year_text)
-    rp = release_period.lower()
+    rp = release_period_text.lower()
 
     if "1990" in rp or "90" in rp:
         return 6.0 if 1990 <= year <= 1999 else 0.0
@@ -208,15 +218,16 @@ def _release_period_bonus(release_period: str, year_value: str) -> float:
     return 0.0
 
 
-def _setting_period_bonus(setting_period: str, combined_text: str) -> float:
+def _setting_period_bonus(setting_period, combined_text: str) -> float:
     """
     Match story setting period ONLY against overview/doc text, not release year.
     """
-    if not setting_period:
+    setting_period_text = _period_text(setting_period)
+    if not setting_period_text:
         return 0.0
 
     text = _norm(combined_text)
-    sp = setting_period.lower()
+    sp = setting_period_text.lower()
 
     hints = []
 
@@ -267,6 +278,8 @@ def rerank(query: str, candidates: list[dict], attributes: dict) -> list[dict]:
         keywords_text = meta.get("keywords", "") or ""
         collection_name = meta.get("collection", "") or ""
         tagline = meta.get("tagline", "") or ""
+        media_type = meta.get("media_type", "movie")
+        media_label = meta.get("media_label", "Movie")
 
         # Separate title text from plot text
         title_text = " ".join([title, original_title, collection_name]).lower()
@@ -368,6 +381,8 @@ def rerank(query: str, candidates: list[dict], attributes: dict) -> list[dict]:
             "overview": overview,
             "genres": genres_text,
             "keywords": keywords_text,
+            "media_type": media_type,
+            "media_label": media_label,
             "score": score,
             "why": why
         })
