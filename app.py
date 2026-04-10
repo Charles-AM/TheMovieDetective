@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import streamlit as st
 import chromadb
 from sentence_transformers import SentenceTransformer
@@ -42,182 +43,23 @@ except Exception:
     st.stop()
 
 # --- STYLES ---
-st.markdown("""
-<style>
-    .stApp {
-        background:
-            radial-gradient(circle at top left, rgba(229,9,20,0.18), transparent 28%),
-            radial-gradient(circle at top right, rgba(29,78,216,0.18), transparent 30%),
-            linear-gradient(180deg, #05070d 0%, #0b1020 45%, #090d18 100%);
-        color: #f8fafc;
-    }
+BASE_DIR = Path(__file__).resolve().parent
 
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
-        border-right: 1px solid rgba(255,255,255,0.06);
-    }
 
-    .hero-wrap {
-        position: relative;
-        overflow: hidden;
-        padding: 2.7rem 2.2rem 2.2rem 2.2rem;
-        border-radius: 30px;
-        background:
-            linear-gradient(135deg, rgba(229,9,20,0.22), rgba(59,130,246,0.12)),
-            rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 24px 60px rgba(0,0,0,0.35);
-        margin-bottom: 1.8rem;
-    }
+def inject_css() -> None:
+    css_path = BASE_DIR / "styles" / "app.css"
+    if not css_path.exists():
+        st.warning("Stylesheet missing: styles/app.css")
+        return
 
-    .hero-title {
-        font-size: 3.25rem;
-        font-weight: 900;
-        line-height: 1.0;
-        margin-bottom: 0.8rem;
-        letter-spacing: -0.02em;
-        color: #ffffff;
-    }
+    st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
-    .hero-subtitle {
-        font-size: 1.08rem;
-        color: #d1d5db;
-        max-width: 920px;
-        line-height: 1.65;
-        margin-bottom: 1.25rem;
-    }
 
-    .pill-row {
-        display: flex;
-        gap: 0.65rem;
-        flex-wrap: wrap;
-        margin-top: 0.4rem;
-    }
-
-    .pill {
-        display: inline-block;
-        padding: 0.45rem 0.85rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.08);
-        color: #e5e7eb;
-        font-size: 0.88rem;
-        font-weight: 600;
-    }
-
-    .section-title {
-        font-size: 1.55rem;
-        font-weight: 850;
-        color: #ffffff;
-        margin-top: 0.35rem;
-        margin-bottom: 0.9rem;
-    }
-
-    .movie-card {
-        background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.035));
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 22px;
-        overflow: hidden;
-        padding: 0.7rem;
-        transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-        box-shadow: 0 14px 34px rgba(0,0,0,0.24);
-        backdrop-filter: blur(10px);
-        height: 100%;
-    }
-
-    .movie-card:hover {
-        transform: translateY(-6px) scale(1.01);
-        box-shadow: 0 22px 46px rgba(0,0,0,0.34);
-        border-color: rgba(229,9,20,0.35);
-    }
-
-    .movie-title {
-        font-size: 1.08rem;
-        font-weight: 800;
-        color: #f8fafc;
-        margin-top: 0.7rem;
-        margin-bottom: 0.25rem;
-        line-height: 1.25;
-    }
-
-    .movie-meta {
-        color: #cbd5e1;
-        font-size: 0.9rem;
-        margin-bottom: 0.45rem;
-    }
-
-    .score-badge {
-        display: inline-block;
-        padding: 0.3rem 0.7rem;
-        border-radius: 999px;
-        background: linear-gradient(90deg, rgba(229,9,20,0.20), rgba(59,130,246,0.20));
-        border: 1px solid rgba(255,255,255,0.09);
-        color: #ffffff;
-        font-weight: 800;
-        font-size: 0.86rem;
-        margin-bottom: 0.6rem;
-    }
-
-    .featured-card {
-        padding: 1rem;
-        border-radius: 24px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03));
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 16px 40px rgba(0,0,0,0.28);
-        margin-bottom: 1.4rem;
-    }
-
-    .info-box {
-        padding: 1rem 1.1rem;
-        border-radius: 18px;
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        color: #e5e7eb;
-        margin-bottom: 1rem;
-    }
-
-    .stTextInput > div > div > input {
-        background: rgba(255,255,255,0.07);
-        border: 1px solid rgba(255,255,255,0.09);
-        color: white;
-        border-radius: 18px;
-        padding: 0.95rem 1rem;
-        font-size: 1rem;
-    }
-
-    .stButton button {
-        background: linear-gradient(90deg, #e50914 0%, #b91c1c 100%);
-        color: white;
-        border: none;
-        border-radius: 14px;
-        font-weight: 700;
-        padding: 0.7rem 1.05rem;
-        transition: all 0.18s ease;
-    }
-
-    .stButton button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 20px rgba(229,9,20,0.25);
-    }
-
-    div[data-testid="stMetric"] {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        padding: 0.7rem 0.8rem;
-        border-radius: 18px;
-    }
-
-    .footer-note {
-        color: #94a3b8;
-        font-size: 0.86rem;
-        margin-top: 1rem;
-    }
-</style>
-""", unsafe_allow_html=True)
+inject_css()
 
 # --- SESSION STATE ---
 defaults = {
-    "input_query": "",
+    "input_query": "animated Bible movie about Moses with great songs",
     "submitted_query": "",
     "results": [],
     "top_result": None,
@@ -327,75 +169,84 @@ def run_search(query_text: str, keep_rejections: bool = False):
 
 
 # --- SIDEBAR ---
-with st.sidebar:
-    st.markdown("## 🎬 Movie Detective")
-    st.caption("Hybrid movie + TV retrieval for vague human memory")
+# --- QUICK IDEAS ---
+quick_ideas = [
+    ("Scary doll movie", "scary doll horror movie with a possessed doll"),
+    ("Dreams inside dreams", "movie about dreams inside dreams and stealing ideas"),
+    ("Ship hits iceberg", "movie about a ship hitting an iceberg and tragic romance"),
+    ("Space station docking", "movie with a realistic space station docking sequence"),
+]
 
-    st.metric("Titles Indexed", f"{collection.count():,}")
+clue_order = [
+    "genres",
+    "themes",
+    "setting",
+    "characters",
+    "keywords",
+    "franchise",
+    "release_period",
+    "setting_period",
+    "title_hint",
+]
 
-    st.markdown("### Quick Search Ideas")
-    st.button(
-        "Animated Bible movie about Moses",
-        use_container_width=True,
-        on_click=queue_quick_query,
-        args=("animated Bible movie about Moses with great songs",)
-    )
-    st.button(
-        "Scary doll movie",
-        use_container_width=True,
-        on_click=queue_quick_query,
-        args=("scary doll horror movie with a possessed doll",)
-    )
-    st.button(
-        "Dreams inside dreams",
-        use_container_width=True,
-        on_click=queue_quick_query,
-        args=("movie about dreams inside dreams and stealing ideas",)
-    )
-    st.button(
-        "Ship hits iceberg",
-        use_container_width=True,
-        on_click=queue_quick_query,
-        args=("movie about a ship hitting an iceberg and tragic romance",)
-    )
+def close_html_div() -> None:
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("### About the system")
-    st.markdown("""
-<div class="info-box">
-Movie Detective was developed by Charles Appiah Manu and Bryan Chau.It combines semantic retrieval, HyDE query expansion, structured clue extraction, and metadata-aware reranking to identify movies and TV series from incomplete memories.
+st.markdown(
+    f"""
+<div class="top-nav">
+  <div>
+    <div class="brand-title">MOVIE DETECTIVE</div>
+    <div class="brand-sub">Memory-to-Motion Retrieval</div>
+  </div>
+  <div>
+    <div class="archive-stat">Archives Indexed</div>
+    <div class="archive-value">{collection.count():,} TITLES</div>
+  </div>
 </div>
-""", unsafe_allow_html=True)
-
-    st.caption("Built for discovery, not exact-title lookup.")
-
-# --- HERO ---
-st.markdown("""
-<div class="hero-wrap">
-    <div class="hero-title">Movie Detective</div>
-    <div class="hero-subtitle">
-        Describe any movie or TV show the way you actually remember it — scenes, fragments, characters, setting, mood, soundtrack, or plot clues.
-        Movie Detective interprets the memory and surfaces likely movie/TV matches as visual cards.
-    </div>
-    <div class="pill-row">
-        <span class="pill">Semantic Search</span>
-        <span class="pill">HyDE Expansion</span>
-        <span class="pill">Metadata Reranking</span>
-        <span class="pill">Visual Discovery</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.text_input(
-    "Search",
-    key="input_query",
-    placeholder="e.g. father fish searching the ocean for his lost son"
+""",
+    unsafe_allow_html=True,
 )
 
-btn_col1, btn_col2 = st.columns(2)
-with btn_col1:
-    st.button("Search", use_container_width=True, on_click=queue_search)
-with btn_col2:
-    st.button("Clear", use_container_width=True, on_click=clear_search)
+left_col, right_col = st.columns([1.05, 1.4], gap="large")
+
+with left_col:
+    st.markdown('<div class="left-rail">', unsafe_allow_html=True)
+    st.markdown(
+        """
+<div class="panel-title">Identify that <span class="accent">missing</span> scene.</div>
+<div class="panel-copy">
+Describe fragments: mood, soundtrack, characters, setting, or specific plot points.
+The search pipeline reconstructs your memory into ranked movie and TV candidates.
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.text_area(
+        "Describe your memory",
+        key="input_query",
+        label_visibility="collapsed",
+        placeholder="I remember a movie where...",
+    )
+
+    action_a, action_b = st.columns([1.2, 0.8])
+    with action_a:
+        st.button("Find Movie", use_container_width=True, on_click=queue_search)
+    with action_b:
+        st.button("Clear", use_container_width=True, on_click=clear_search)
+
+    st.markdown('<div class="chip-label">Quick Memory Sparks</div>', unsafe_allow_html=True)
+    q1, q2 = st.columns(2)
+    with q1:
+        st.button(quick_ideas[0][0], key="q0", use_container_width=True, on_click=queue_quick_query, args=(quick_ideas[0][1],))
+        st.button(quick_ideas[2][0], key="q2", use_container_width=True, on_click=queue_quick_query, args=(quick_ideas[2][1],))
+    with q2:
+        st.button(quick_ideas[1][0], key="q1", use_container_width=True, on_click=queue_quick_query, args=(quick_ideas[1][1],))
+        st.button(quick_ideas[3][0], key="q3", use_container_width=True, on_click=queue_quick_query, args=(quick_ideas[3][1],))
+
+    st.caption("Built by Charles Appiah Manu and Bryan Chau")
+    close_html_div()
 
 if st.session_state.do_search:
     run_search(st.session_state.input_query, keep_rejections=st.session_state.keep_rejections)
@@ -404,134 +255,104 @@ results = st.session_state.results
 top = st.session_state.top_result
 attributes = st.session_state.attributes
 
-if results and top:
-    st.markdown('<div class="section-title">Top Match</div>', unsafe_allow_html=True)
-
+with right_col:
     if st.session_state.feedback_message:
         st.info(st.session_state.feedback_message)
 
-    fc1, fc2 = st.columns([1.05, 1.95])
+    if results and top:
+        st.markdown('<div class="section-title">Primary Match</div>', unsafe_allow_html=True)
+        st.markdown('<div class="featured-shell">', unsafe_allow_html=True)
+        top_img_col, top_content_col = st.columns([0.9, 1.3], gap="medium")
 
-    with fc1:
-        if top.get("poster"):
-            st.image(top["poster"], use_container_width=True)
+        with top_img_col:
+            if top.get("poster"):
+                st.image(top["poster"], use_container_width=True)
+            else:
+                st.markdown('<div class="empty-box">Poster unavailable</div>', unsafe_allow_html=True)
 
-    with fc2:
+        with top_content_col:
+            safe_top_score = max(0.0, min(100.0, float(top.get("score", 0.0))))
+            st.markdown(
+                f"<div class='movie-title'>{top['title']} <span class='movie-meta'>({top['year']})</span></div>",
+                unsafe_allow_html=True,
+            )
+            if top.get("media_label"):
+                st.caption(top["media_label"])
+            st.markdown(
+                f"<div class='score-badge'>Reliability: {safe_top_score:.1f}%</div>",
+                unsafe_allow_html=True,
+            )
+            if top.get("genres"):
+                st.markdown(f"<div class='movie-meta'>{top['genres']}</div>", unsafe_allow_html=True)
+
+            st.write(top.get("overview", "No overview available."))
+
+            why_bits = top.get("why", [])
+            if why_bits:
+                st.markdown(
+                    "<div class='detective-box'><strong>Detective Notes:</strong><br>"
+                    + " • ".join(why_bits[:5])
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+
+            r1, r2 = st.columns(2)
+            with r1:
+                st.button("This is it", use_container_width=True, on_click=vote_up_results)
+            with r2:
+                st.button("Not quite", use_container_width=True, on_click=vote_down_results)
+
+        close_html_div()
+
+        if attributes:
+            rendered_clues = []
+            for label in clue_order:
+                value = attributes.get(label)
+                if isinstance(value, list) and value:
+                    rendered_clues.append(f"<span class='clue-chip'>{label.replace('_', ' ').title()}: {', '.join(value)}</span>")
+                elif isinstance(value, str) and value.strip():
+                    rendered_clues.append(f"<span class='clue-chip'>{label.replace('_', ' ').title()}: {value}</span>")
+            if rendered_clues:
+                st.markdown('<div class="section-title">Extracted Evidence</div>', unsafe_allow_html=True)
+                st.markdown("<div class='clue-wrap'>" + "".join(rendered_clues) + "</div>", unsafe_allow_html=True)
+
+        st.markdown('<div class="section-title">Other Potential Suspects</div>', unsafe_allow_html=True)
+        lineup = results[1:9] if len(results) > 1 else []
+        if lineup:
+            grid_cols = st.columns(4)
+            for idx, movie in enumerate(lineup):
+                with grid_cols[idx % 4]:
+                    st.markdown('<div class="small-card">', unsafe_allow_html=True)
+                    if movie.get("poster"):
+                        st.image(movie["poster"], use_container_width=True)
+                    else:
+                        st.markdown('<div class="empty-box">No poster</div>', unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='small-card-title'>{movie['title']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    media_label = movie.get("media_label", "Movie")
+                    st.markdown(
+                        f"<div class='small-card-meta'>{movie['year']} • {media_label}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    with st.expander("Investigate"):
+                        st.write(movie.get("overview", "No overview available."))
+                    close_html_div()
+        else:
+            st.markdown('<div class="empty-box">No additional suspects from this search yet.</div>', unsafe_allow_html=True)
+    else:
         st.markdown(
-            f"<div class='movie-title' style='font-size:1.9rem'>{top['title']} ({top['year']})</div>",
-            unsafe_allow_html=True
-        )
-        if top.get("media_label"):
-            st.caption(top["media_label"])
-        st.markdown(
-            f"<div class='score-badge'>Match Score: {top['score']:.1f}</div>",
-            unsafe_allow_html=True
-        )
-        if top.get("genres"):
-            st.markdown(
-                f"<div class='movie-meta'>{top['genres']}</div>",
-                unsafe_allow_html=True
-            )
-        st.write(top.get("overview", "No overview available."))
-
-        why_bits = top.get("why", [])
-        if why_bits:
-            st.caption("Why it matched: " + " • ".join(why_bits[:5]))
-
-    st.markdown('<div class="section-title">Rate These Results</div>', unsafe_allow_html=True)
-    st.caption("These buttons apply to the current top 10 results, not only the featured card.")
-
-    fb1, fb2 = st.columns(2)
-    with fb1:
-        st.button("👏 My movie is in the Top 5", use_container_width=True, on_click=vote_up_results)
-    with fb2:
-        st.button(" 🫤 Movie not in results, Re-search", use_container_width=True, on_click=vote_down_results)
-
-    if attributes:
-        clues = []
-        for label in [
-            "title_hint",
-            "franchise",
-            "genres",
-            "themes",
-            "setting",
-            "release_period",
-            "setting_period",
-            "characters",
-            "keywords"
-        ]:
-            value = attributes.get(label)
-            if isinstance(value, list) and value:
-                clues.append(f"**{label.replace('_', ' ').title()}:** {', '.join(value)}")
-            elif isinstance(value, str) and value.strip():
-                clues.append(f"**{label.replace('_', ' ').title()}:** {value}")
-
-        if clues:
-            st.markdown('<div class="section-title">Interpreted Memory Clues</div>', unsafe_allow_html=True)
-            st.markdown(
-                "<div class='info-box'>" + "<br>".join(clues) + "</div>",
-                unsafe_allow_html=True
-            )
-
-    st.markdown('<div class="section-title">Browse Results</div>', unsafe_allow_html=True)
-
-    cols = st.columns(3)
-    display_results = results[:10]
-    for i, movie in enumerate(display_results):
-        with cols[i % 3]:
-            if movie.get("poster"):
-                st.image(movie["poster"], use_container_width=True)
-
-            st.markdown(
-                f"<div class='movie-title'>{movie['title']} ({movie['year']})</div>",
-                unsafe_allow_html=True
-            )
-
-            if movie.get("media_label"):
-                st.caption(movie["media_label"])
-
-            meta_line = movie["genres"] if movie.get("genres") else "Metadata available"
-            st.markdown(
-                f"<div class='movie-meta'>{meta_line}</div>",
-                unsafe_allow_html=True
-            )
-
-            st.markdown(
-                f"<div class='score-badge'>Match Score: {movie['score']:.1f}</div>",
-                unsafe_allow_html=True
-            )
-
-            safe_score = max(0.0, min(100.0, float(movie["score"])))
-            st.progress(safe_score / 100.0)
-
-            with st.expander("View details"):
-                st.write(movie.get("overview", "No overview available."))
-                if movie.get("keywords"):
-                    st.caption(f"Keywords: {movie['keywords']}")
-                if movie.get("why"):
-                    st.caption("Why it matched: " + " • ".join(movie["why"][:5]))
-
-    st.markdown(
-        "<div class='footer-note'>Tip: add setting, release period, story period, franchise, relationship, or a very specific scene to improve accuracy.</div>",
-        unsafe_allow_html=True
-    )
-else:
-    if st.session_state.feedback_message:
-        st.info(st.session_state.feedback_message)
-
-    st.markdown("""
-<div class="section-title">Start with a memory fragment</div>
-<div class="info-box">
-Examples:
-<ul>
-<li>animated Bible movie about Moses</li>
-<li>scary doll horror movie</li>
-<li>movie where a ship crashes into an iceberg</li>
-<li>a Spanish series where red-suited robbers plan major heists</li>
-<li>a detective hunts a serial killer in the rain</li>
-<li>father fish searching the ocean for his lost son</li>
-<li>an action movie about a retired assassin avenging his dog</li>
-<li>a movie set in the 1980s with kids and supernatural events</li>
-</ul>
+            """
+<div class="empty-box">
+  <h3 style="margin:0;color:#f8fafc;">Awaiting Input</h3>
+  <p style="margin-top:0.7rem;">Enter your memory fragments on the left to begin retrieval.</p>
 </div>
-""", unsafe_allow_html=True)
+""",
+            unsafe_allow_html=True,
+        )
+
+st.markdown(
+    "<div class='footer-note'>Powered by Semantic Retrieval Technology • Built for Discovery</div>",
+    unsafe_allow_html=True,
+)
