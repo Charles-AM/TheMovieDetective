@@ -1,13 +1,12 @@
 # TheMovieDetective
-
-A hybrid movie and TV retrieval app that combines semantic search with intent-aware reranking. It can use spoiler summaries for better recall while keeping spoilers hidden from users.
+## Built by Charles Appiah Manu and Bryan Chau
+A hybrid movie and TV retrieval app that combines semantic search with intent-aware reranking. 
 
 ## Features
 - Hybrid search with semantic embeddings + reranking
-- Intent-aware results (animation/anime, K-drama, Asian titles)
-- Optional spoiler summaries from themoviespoiler.com, hidden from users
-- Feedback loop to refine results when the top results are wrong
-- Streamlit UI with quick search ideas and extracted clues
+- Intent-aware results (animation/anime, K-drama, Asian titles,Live-Action )
+- Feedback loop to refine results when the top results are wrong.
+- Streamlit UI with quick search ideas and extracted clues.
 
 ## Quickstart
 
@@ -36,9 +35,6 @@ CLAUDE_API_KEY=your_claude_key
 python ingest.py
 ```
 
-Optional flags are inside `ingest.py` if you want spoilers or classics:
-- `include_spoilers=True` to pull spoiler summaries
-- `include_classics=True` to ingest older titles
 
 ### 5) Run the app
 ```bash
@@ -60,14 +56,9 @@ python -m pytest tests/test_search.py
 
 ## Example Queries
 - `animated movie about Moses and the exodus`
-- `k drama about lost memories and romance`
-- `asian crime thriller set in a port city`
 - `cartoon about toys that come to life`
 - `movie where a ship hits an iceberg and there is a love story`
 
-## Deployment (Free)
-- **Streamlit Community Cloud**: connect your GitHub repo and set `CLAUDE_API_KEY` and `TMDB_API_KEY` as secrets.
-- **Hugging Face Spaces**: choose a Streamlit space and add secrets in settings.
 
 ## Project Structure
 ```
@@ -79,9 +70,4 @@ styles/               # App CSS
 tests/                # Tests for reranking
 ```
 
-## Notes
-- Unique title count in the UI is based on title + year + media type.
-- For K-drama or Asian title intent, results are boosted using country/language metadata.
 
-## License
-Add your license here.
