@@ -10,6 +10,41 @@ GENERIC_TERMS = {
     "cop", "police", "detective", "doll", "fish", "shark", "ghost"
 }
 
+ANIMATION_TOKENS = {
+    "animation", "animated", "anime", "cartoon", "cartoons", "toon",
+    "pixar", "disney", "dreamworks", "ghibli"
+}
+
+ANIMATION_SIGNAL_TERMS = {
+    "animation", "animated", "anime", "cartoon", "pixar", "disney", "dreamworks", "ghibli"
+}
+
+K_DRAMA_TOKENS = {
+    "kdrama", "k-drama", "k drama", "korean drama", "korean series",
+    "korean tv", "korean tv show"
+}
+
+KOREAN_SIGNAL_TERMS = {
+    "korea", "korean", "south korea", "seoul", "busan"
+}
+
+ASIAN_INTENT_TOKENS = {
+    "asian", "asia", "japanese", "korean", "chinese", "taiwanese",
+    "thai", "vietnamese", "indian", "pakistani", "bangladeshi",
+    "filipino", "indonesian", "malaysian", "singaporean", "nepali",
+    "sri lankan", "cambodian", "burmese", "laotian"
+}
+
+ASIAN_SIGNAL_TERMS = {
+    "asia", "asian", "japan", "japanese", "korea", "korean", "south korea",
+    "china", "chinese", "hong kong", "taiwan", "taiwanese", "thailand",
+    "thai", "vietnam", "vietnamese", "india", "indian", "pakistan",
+    "pakistani", "bangladesh", "bangladeshi", "philippines", "filipino",
+    "indonesia", "indonesian", "malaysia", "malaysian", "singapore",
+    "singaporean", "sri lanka", "sri lankan", "nepal", "nepali",
+    "myanmar", "burma", "burmese", "cambodia", "cambodian", "laos", "laotian"
+}
+
 
 def _safe_json_from_text(text: str, fallback: dict) -> dict:
     if not text:
@@ -126,6 +161,60 @@ def _norm(text: str) -> str:
 
 def _tokenize(text: str) -> list[str]:
     return [tok for tok in re.findall(r"[a-zA-Z0-9\-']+", _norm(text)) if len(tok) > 2]
+
+
+def _wants_animation(query: str, attributes: dict) -> bool:
+    query_tokens = set(_tokenize(query))
+    if query_tokens.intersection(ANIMATION_TOKENS):
+        return True
+
+    genres = attributes.get("genres", []) or []
+    for genre in genres:
+        genre_n = _norm(genre)
+        if "animation" in genre_n or "anime" in genre_n:
+            return True
+
+    return False
+
+
+def _has_any_phrase(text: str, phrases: set[str]) -> bool:
+    if not text:
+        return False
+    text_n = _norm(text)
+    tokens = set(_tokenize(text_n))
+    for phrase in phrases:
+        phrase_n = _norm(phrase)
+        if not phrase_n:
+            continue
+        if " " in phrase_n:
+            pattern = r"\b" + re.escape(phrase_n).replace("\\ ", r"\s+") + r"\b"
+            if re.search(pattern, text_n):
+                return True
+        else:
+            if phrase_n in tokens:
+                return True
+    return False
+
+
+def _wants_k_drama(query: str) -> bool:
+    return _has_any_phrase(query, K_DRAMA_TOKENS)
+
+
+def _wants_asian(query: str) -> bool:
+    return _has_any_phrase(query, ASIAN_INTENT_TOKENS)
+
+
+def _is_animation_candidate(text: str) -> bool:
+    text_n = _norm(text)
+    return any(term in text_n for term in ANIMATION_SIGNAL_TERMS)
+
+
+def _has_korean_signal(text: str) -> bool:
+    return _has_any_phrase(text, KOREAN_SIGNAL_TERMS)
+
+
+def _has_asian_signal(text: str) -> bool:
+    return _has_any_phrase(text, ASIAN_SIGNAL_TERMS)
 
 
 def _contains_any(haystack: str, items: list[str]) -> int:
@@ -280,6 +369,9 @@ def rerank(query: str, candidates: list[dict], attributes: dict) -> list[dict]:
     exclude = attributes.get("exclude", []) or []
     release_period = attributes.get("release_period", "")
     setting_period = attributes.get("setting_period", "")
+    wants_animation = _wants_animation(query, attributes)
+    wants_k_drama = _wants_k_drama(query)
+    wants_asian = _wants_asian(query)
 
     query_tokens = _tokenize(query)
     named_entities = [tok.lower() for tok in re.findall(r"\b[A-Z][a-z]+\b", query or "")]
@@ -302,11 +394,14 @@ def rerank(query: str, candidates: list[dict], attributes: dict) -> list[dict]:
         media_label = meta.get("media_label", "Movie")
         spoiler_excerpt = meta.get("spoiler_excerpt", "") or ""
         spoiler_source_url = meta.get("spoiler_source_url", "") or ""
+        countries_text = meta.get("countries", "") or ""
+        languages_text = meta.get("languages", "") or ""
 
         # Separate title text from plot text
         title_text = " ".join([title, original_title, collection_name]).lower()
         plot_text = " ".join([overview, tagline, keywords_text, spoiler_excerpt, doc]).lower()
-        combined_text = " ".join([title_text, plot_text, genres_text]).lower()
+        combined_text = " ".join([title_text, plot_text, genres_text, countries_text, languages_text]).lower()
+        signal_text = " ".join([genres_text, keywords_text, title_text, plot_text, countries_text, languages_text])
 
         rank_index = max(1, int(c.get("rank", 1)))
 
@@ -331,6 +426,40 @@ def rerank(query: str, candidates: list[dict], attributes: dict) -> list[dict]:
         if genre_hits:
             score += min(8.0, genre_hits * 3.5)
             why.append("genre matched")
+
+        # Favor animated content when the user is explicit about cartoons/anime
+        is_animation = _is_animation_candidate(signal_text)
+        if wants_animation:
+            if is_animation:
+                score += 12.0
+                why.append("animation intent matched")
+            else:
+                score -= 14.0
+                why.append("non-animated downweighted")
+
+        # Favor K-drama content when the user is explicit about it
+        if wants_k_drama:
+            is_korean = _has_korean_signal(signal_text)
+            if media_type == "tv" and is_korean:
+                score += 14.0
+                why.append("k-drama match")
+            elif media_type == "tv":
+                score += 5.0
+                why.append("tv series matched")
+            elif is_korean:
+                score += 7.0
+                why.append("korean match")
+            else:
+                score -= 14.0
+                why.append("non-kdrama downweighted")
+        elif wants_asian:
+            is_asian = _has_asian_signal(signal_text)
+            if is_asian:
+                score += 9.0
+                why.append("asian match")
+            else:
+                score -= 9.0
+                why.append("non-asian downweighted")
 
         # Theme/setting/character/keyword should reward plot text more than title text
         theme_hits = _contains_any(plot_text, themes)

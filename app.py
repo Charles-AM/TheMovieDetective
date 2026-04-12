@@ -36,6 +36,28 @@ def init():
     return model, collection
 
 
+@st.cache_data(ttl=1800)
+def get_unique_title_count() -> int:
+    try:
+        payload = collection.get(include=["metadatas"])
+    except Exception:
+        return 0
+
+    metadatas = payload.get("metadatas") or []
+    unique_keys = set()
+    for meta in metadatas:
+        if not isinstance(meta, dict):
+            continue
+        title = (meta.get("title") or "").strip().lower()
+        year = (meta.get("year") or "").strip()
+        media_type = (meta.get("media_type") or "").strip().lower()
+        if not title:
+            continue
+        unique_keys.add((title, year, media_type))
+
+    return len(unique_keys)
+
+
 try:
     model, collection = init()
 except Exception:
@@ -59,7 +81,7 @@ inject_css()
 
 # --- SESSION STATE ---
 defaults = {
-    "input_query": "animated Bible movie about Moses with great songs",
+    "input_query": "",
     "submitted_query": "",
     "results": [],
     "top_result": None,
@@ -95,7 +117,7 @@ def current_result_keys(limit: int = 10) -> list[str]:
 
 
 def vote_up_results():
-    st.session_state.feedback_message = "Nice. I will keep this result set style for your query."
+    st.session_state.feedback_message = "Thank you for your feedback ??."
 
 
 def vote_down_results():
@@ -107,7 +129,7 @@ def vote_down_results():
         if key not in st.session_state.rejected_keys:
             st.session_state.rejected_keys.append(key)
 
-    st.session_state.feedback_message = "Got it. I removed these results and searched again."
+    st.session_state.feedback_message = "Got it. Refining search results."
     st.session_state.keep_rejections = True
     st.session_state.do_search = True
 
@@ -174,7 +196,7 @@ quick_ideas = [
     ("Scary doll movie", "scary doll horror movie with a possessed doll"),
     ("Dreams inside dreams", "movie about dreams inside dreams and stealing ideas"),
     ("Ship hits iceberg", "movie about a ship hitting an iceberg and tragic romance"),
-    ("Space station docking", "movie with a realistic space station docking sequence"),
+    ("Toys that come to life", "cartoon about toys that come to life"),
 ]
 
 clue_order = [
@@ -197,11 +219,11 @@ st.markdown(
 <div class="top-nav">
   <div>
     <div class="brand-title">MOVIE DETECTIVE</div>
-    <div class="brand-sub">Memory-to-Motion Retrieval</div>
+    <div class="brand-sub">Movie Retrieval System</div>
   </div>
   <div>
-    <div class="archive-stat">Archives Indexed</div>
-    <div class="archive-value">{collection.count():,} TITLES</div>
+    <div class="archive-stat">Movies and TV shows Indexed</div>
+    <div class="archive-value">{get_unique_title_count():,} TITLES</div>
   </div>
 </div>
 """,
@@ -214,10 +236,9 @@ with left_col:
     st.markdown('<div class="left-rail">', unsafe_allow_html=True)
     st.markdown(
         """
-<div class="panel-title">Identify that <span class="accent">missing</span> scene.</div>
+<div class="panel-title">Your <span class="accent"> movie </span>search ends here.</div>
 <div class="panel-copy">
-Describe fragments: mood, soundtrack, characters, setting, or specific plot points.
-The search pipeline reconstructs your memory into ranked movie and TV candidates.
+Vague memory? No problem. Describe the vibe, a character, or the plot and we’ll help you find what you've been searching for..
 </div>
 """,
         unsafe_allow_html=True,
@@ -227,7 +248,7 @@ The search pipeline reconstructs your memory into ranked movie and TV candidates
         "Describe your memory",
         key="input_query",
         label_visibility="collapsed",
-        placeholder="I remember a movie where...",
+        placeholder="Type what you remember: was it a cartoon, anime, or live-action? Mention key scenes, characters, time period, or ending details.",
     )
 
     action_a, action_b = st.columns([1.2, 0.8])
@@ -296,11 +317,12 @@ with right_col:
                     unsafe_allow_html=True,
                 )
 
+            st.markdown("<div class='feedback-prompt'>Was your movie found?</div>", unsafe_allow_html=True)
             r1, r2 = st.columns(2)
             with r1:
-                st.button("This is it", use_container_width=True, on_click=vote_up_results)
+                st.button("Yes, it's in the top 5", use_container_width=True, on_click=vote_up_results)
             with r2:
-                st.button("Not quite", use_container_width=True, on_click=vote_down_results)
+                st.button("No, it's not in the results", use_container_width=True, on_click=vote_down_results)
 
         close_html_div()
 

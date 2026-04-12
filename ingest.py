@@ -128,6 +128,8 @@ def build_title_document(
         "poster": poster_url,
         "media_type": media_type,
         "media_label": media_label,
+        "countries": ", ".join(production_countries),
+        "languages": ", ".join(spoken_languages),
         "spoiler_excerpt": spoiler_excerpt,
         "spoiler_source_url": spoiler_source_url,
     }
