@@ -49,10 +49,6 @@ streamlit run app.py
 ### Spoilers Are Hidden
 If spoiler summaries are enabled, the system uses them only for search relevance. The UI does not display spoilers to users.
 
-## Testing
-```bash
-python -m pytest tests/test_search.py
-```
 
 ## Example Queries
 - `animated movie about Moses and the exodus`
