@@ -50,7 +50,7 @@ streamlit run app.py
 If spoiler summaries are enabled, the system uses them only for search relevance. The UI does not display spoilers to users.
 
 
-## Example Queries
+## Examples of some user queries
 - `animated movie about Moses and the exodus`
 - `cartoon about toys that come to life`
 - `movie where a ship hits an iceberg and there is a love story`
