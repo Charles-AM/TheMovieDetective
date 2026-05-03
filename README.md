@@ -55,6 +55,17 @@ If spoiler summaries are enabled, the system uses them only for search relevance
 - `cartoon about toys that come to life`
 - `movie where a ship hits an iceberg and there is a love story`
 
+## Screenshots
+Place the images in `assets/` at the repo root using the filenames below.
+
+**Homepage**
+![Homepage](assets/homepage.png)
+
+**Example searches**
+![Example search 1](assets/example-1.png)
+![Example search 2](assets/example-2.png)
+![Example search 3](assets/example-3.png)
+![Example search 4](assets/example-4.png)
 
 ## Project Structure
 ```
@@ -65,5 +76,3 @@ utils/                # Spoiler scraping helpers
 styles/               # App CSS
 tests/                # Tests for reranking
 ```
-
-
