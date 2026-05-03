@@ -56,7 +56,6 @@ If spoiler summaries are enabled, the system uses them only for search relevance
 - `movie where a ship hits an iceberg and there is a love story`
 
 ## Screenshots
-Place the images in `assets/` at the repo root using the filenames below.
 
 **Homepage**
 ![Homepage](assets/homepage.png)
